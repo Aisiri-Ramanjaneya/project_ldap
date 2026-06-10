@@ -79,9 +79,9 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            cd /d D:\internship\LDAP
+            Set-Location -Path "D:\internship\LDAP"
             git pull origin main
-            cd backend
+            Set-Location -Path "backend"
             npm install --production
-            taskkill /f /im node.exe || true
-            start /b node server.js
+            Stop-Process -Name node -Force -ErrorAction SilentlyContinue
+            Start-Process -FilePath "node" -ArgumentList "server.js" -WindowStyle Hidden
