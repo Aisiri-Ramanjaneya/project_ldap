@@ -1,0 +1,85 @@
+name: LDAP - CI/CD Pipeline
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm install
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          CI: false
+        run: npm run build
+      - name: Health check
+        working-directory: backend
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          LDAP_URL: ldap://localhost:10389
+          LDAP_BASE_DN: dc=example,dc=com
+          LDAP_USER_OU: ou=users,dc=example,dc=com
+          LDAP_ADMIN_DN: uid=admin,ou=system
+          LDAP_ADMIN_PASSWORD: secret
+          PORT: 5000
+        run: |
+          node server.js &
+          sleep 3
+          curl -f http://localhost:5000/api/health
+          kill %1
+      - name: Generate version
+        id: version
+        run: |
+          VERSION="v1.0.${{ github.run_number }}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+      - name: Create Git tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.version.outputs.VERSION }}
+          git push origin ${{ steps.version.outputs.VERSION }}
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          release_name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            Automated release ${{ steps.version.outputs.VERSION }}
+            Deployed by: ${{ github.actor }}
+            Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            cd /d D:\internship\LDAP
+            git pull origin main
+            cd backend
+            npm install --production
+            taskkill /f /im node.exe || true
+            start /b node server.js
