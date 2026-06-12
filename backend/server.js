@@ -19,7 +19,7 @@ app.use("/api/auth", authRoutes);
 
 // ── Health check ────────────────────────────
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "Server is healthy. CD pipeline is working successfully!" });
+  res.json({ status: "ok", message: "Server is active. CD pipeline is working successfully!" });
 });
 
 // ── 404 fallback ────────────────────────────
